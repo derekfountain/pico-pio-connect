@@ -16,7 +16,6 @@ pico_sdk_init()
 
 add_executable(pico-pio-link-2
 pico_2.c
-../common/link_common.c
 )
 
 pico_generate_pio_header(pico-pio-link-2 ${CMAKE_CURRENT_LIST_DIR}/picoputer.pio)
@@ -33,8 +32,6 @@ target_link_libraries(pico-pio-link-2 pico_stdlib)
 target_link_libraries(pico-pio-link-2
         hardware_pio
         hardware_clocks
-	hardware_adc
-        pico_multicore
         )
 
 pico_add_extra_outputs(pico-pio-link-2)
