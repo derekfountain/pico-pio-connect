@@ -17,6 +17,8 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include <stdio.h>
+
 #include <stdlib.h>
 #include "pico/stdlib.h"
 #include "hardware/pio.h"
@@ -26,20 +28,36 @@
 #include "picoputer.pio.h"
 #include "../common/link_common.h"
 
-const uint8_t LED_PIN = PICO_DEFAULT_LED_PIN;
 const uint8_t TEST_OUTPUT_GP  = 0;
+const uint8_t LED_PIN         = PICO_DEFAULT_LED_PIN;
 
 const uint8_t LINKOUT_PIN     = 15;
 const uint8_t LINKIN_PIN      = 14;
 
+#define TEST_BUFFER_SIZE 16
+uint8_t rx_buffer[TEST_BUFFER_SIZE];
+
 int main()
 {
+  stdio_init_all();  
+  sleep_ms(5000);
+
+  printf("Receiving Pico\n\n");
+
   gpio_init( LED_PIN ); gpio_set_dir( LED_PIN, GPIO_OUT );
-  gpio_put( LED_PIN, 0 );
+  gpio_put( LED_PIN, 1 );
   
+  /* Test pin, blips the scope */
+  gpio_init(TEST_OUTPUT_GP); gpio_set_dir(TEST_OUTPUT_GP, GPIO_OUT);
+  gpio_put(TEST_OUTPUT_GP, 0);
+
+  /* Set up the link to the other Pico */
+  gpio_init(LINKOUT_PIN); gpio_set_dir(LINKOUT_PIN,GPIO_OUT); gpio_put(LINKOUT_PIN, 1);
+  gpio_set_function(LINKOUT_PIN, GPIO_FUNC_PIO0);
+
   gpio_init(LINKIN_PIN); gpio_set_dir(LINKIN_PIN,GPIO_IN);
   gpio_set_function(LINKIN_PIN, GPIO_FUNC_PIO0);
-  
+    
   /* Outgoing side of the link */
   int linkout_sm  = pio_claim_unused_sm(pio0, true);
   uint offset     = pio_add_program(pio0, &picoputerlinkout_program);
@@ -49,47 +67,28 @@ int main()
   int linkin_sm   = pio_claim_unused_sm(pio0, true);
   offset          = pio_add_program(pio0, &picoputerlinkin_program);
   picoputerlinkin_program_init(pio0, linkin_sm, offset, LINKIN_PIN);
-  
-  /*
-   * Ping a data byte back and forth. This side sends a 0xFD, then
-   * sits waiting for the other side to respond with 0xDF. Repeats.
-   *
-   * You should see 1 LED blink, then 2 LED blinks, repeatedly.
-   */
-  uint8_t sending = 0;
 
   while(1)
   {
-    sleep_ms(1000);
+    uint8_t data;
+    gpio_put( TEST_OUTPUT_GP, 1 );
+    receive_buffer( pio0, linkin_sm, rx_buffer, TEST_BUFFER_SIZE );
+    gpio_put( TEST_OUTPUT_GP, 0 );
 
-    if( sending )
+    uint8_t checksum = 0;
+    for( int i=0; i < TEST_BUFFER_SIZE; i++ )
     {
-      gpio_put( LED_PIN, 1 );
-      sleep_ms(50);
-      gpio_put( LED_PIN, 0 );
-      sleep_ms(50);
-      gpio_put( LED_PIN, 1 );
-      sleep_ms(50);
-      gpio_put( LED_PIN, 0 );
-
-      const uint32_t data = 0xFD;
-      send_byte( pio0, linkout_sm, data );
-
-      sending = 0;
+      checksum += rx_buffer[i];
     }
-    else
+    gpio_put( TEST_OUTPUT_GP, 1 );
+    send_byte( pio0, linkout_sm, checksum );
+    gpio_put( TEST_OUTPUT_GP, 0 );
+    
+    for( int i=0; i < TEST_BUFFER_SIZE; i++ )
     {
-      uint8_t data = receive_byte( pio0, linkin_sm );
-
-      if( data == 0xDF )
-      {
-	gpio_put( LED_PIN, 1 );
-	sleep_ms(50);
-	gpio_put( LED_PIN, 0 );
-      }
-
-      sending = 1;
+      printf("Received %d : 0x%02X\n", i, rx_buffer[i] );
     }
- 
+    printf("\n\n" );
+    printf("Sending back checksum of 0x%02X\n\n\n", checksum );
   }
 }

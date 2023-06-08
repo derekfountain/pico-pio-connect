@@ -17,6 +17,9 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include <stdio.h>
+
+#include <stdlib.h>
 #include "pico/stdlib.h"
 #include "hardware/pio.h"
 #include "hardware/clocks.h"
@@ -31,9 +34,15 @@ const uint8_t LED_PIN         = PICO_DEFAULT_LED_PIN;
 const uint8_t LINKOUT_PIN     = 15;
 const uint8_t LINKIN_PIN      = 14;
 
+#define TEST_BUFFER_SIZE 16
+uint8_t tx_buffer[TEST_BUFFER_SIZE];
+
 int main()
 {
-  gpio_init( LED_PIN ); gpio_set_dir( LED_PIN, GPIO_OUT );
+  stdio_init_all();  
+  sleep_ms(2000);
+
+  gpio_init( LED_PIN ); gpio_set_dir( LED_PIN, GPIO_OUT ); gpio_put( LED_PIN, 0 );
   
   /* Test pin, blips the scope */
   gpio_init(TEST_OUTPUT_GP); gpio_set_dir(TEST_OUTPUT_GP, GPIO_OUT);
@@ -56,46 +65,52 @@ int main()
   offset          = pio_add_program(pio0, &picoputerlinkin_program);
   picoputerlinkin_program_init(pio0, linkin_sm, offset, LINKIN_PIN);
 
-  /*
-   * Ping a data byte back and forth. This side sends a 0xDF, then
-   * sits waiting for the other side to respond with 0xFD. Repeats.
-   *
-   * You should see 2 LED blinks, then 1 LED blink, repeatedly.
-   */
-  uint8_t sending = 1;
+  /* This side needs to start up before the receiver */
 
-  while(1)
+  gpio_put( LED_PIN, 1 );
+  sleep_ms(50);
+  gpio_put( LED_PIN, 0 );
+  sleep_ms(50);
+  gpio_put( LED_PIN, 1 );
+  sleep_ms(50);
+  gpio_put( LED_PIN, 0 );
+  
+  /* Fill TX buffer */
+  uint8_t checksum = 0;
+  for( int i=0; i < TEST_BUFFER_SIZE; i++ )
   {
-    sleep_ms(1000);
-
-    if( sending )
-    {
-      gpio_put( LED_PIN, 1 );
-      sleep_ms(50);
-      gpio_put( LED_PIN, 0 );
-      sleep_ms(50);
-      gpio_put( LED_PIN, 1 );
-      sleep_ms(50);
-      gpio_put( LED_PIN, 0 );
-
-      const uint32_t data = 0xDF;
-      send_byte( pio0, linkout_sm, data );
-
-      sending = 0;
-    }
-    else
-    {
-      uint8_t data = receive_byte( pio0, linkin_sm );
-
-      if( data == 0xFD )
-      {
-	gpio_put( LED_PIN, 1 );
-	sleep_ms(50);
-	gpio_put( LED_PIN, 0 );
-      }
-
-      sending = 1;
-    }
-
+    tx_buffer[i] = (uint8_t)(uint8_t)rand();
+    checksum += tx_buffer[i];
   }
+
+  for( int i=0; i < TEST_BUFFER_SIZE; i++ )
+  {
+    printf("Sending %d : 0x%02X\n", i, tx_buffer[i] );
+  }
+  gpio_put( TEST_OUTPUT_GP, 1 );
+  send_buffer( pio0, linkout_sm, tx_buffer, TEST_BUFFER_SIZE );
+  gpio_put( TEST_OUTPUT_GP, 0 );
+
+  __asm volatile ("nop");
+  __asm volatile ("nop");
+  __asm volatile ("nop");
+  __asm volatile ("nop");
+  __asm volatile ("nop");
+  __asm volatile ("nop");
+  __asm volatile ("nop");
+  __asm volatile ("nop");
+  __asm volatile ("nop");
+  __asm volatile ("nop");
+  __asm volatile ("nop");
+  __asm volatile ("nop");
+
+  uint8_t receiver_checksum;
+  gpio_put( TEST_OUTPUT_GP, 1 );
+  while( receive_byte( pio0, linkin_sm, &receiver_checksum ) == LINK_BYTE_NONE );
+  gpio_put( TEST_OUTPUT_GP, 0 );
+
+  printf("Calculated checksum 0x%02X\n", checksum );
+  printf("Received   checksum 0x%02X\n\n\n", receiver_checksum );
+
+  while(1);
 }

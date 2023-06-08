@@ -125,6 +125,7 @@ void picoputerlinkout_program_putc(PIO pio, uint sm, int c)
 
 ; IN pin 0 and JMP pin are both mapped to the GPIO used as linkin.
 
+.wrap_target
 start:
     wait 0 pin 0        ; Stall until start bit is asserted
     set x, 9    [10]    ; Preload bit counter, then delay until halfway through the second bit
@@ -142,7 +143,7 @@ bitloop:                ; the first data bit (12 cycles incl wait, set).
 
 good_stop:              ; No delay before returning to start; a little slack is
     push                ; important in case the TX clock is slightly too fast.
-
+.wrap
 
 % c-sdk {
 static inline void picoputerlinkin_program_init(PIO pio, uint sm, uint offset, uint pin) {
@@ -154,7 +155,7 @@ static inline void picoputerlinkin_program_init(PIO pio, uint sm, uint offset, u
     sm_config_set_in_pins(&c, pin); // for WAIT, IN
     sm_config_set_jmp_pin(&c, pin); // for JMP
 
-    // Shift to right, autopull disabled
+    // Shift to right, autopush disabled
     sm_config_set_in_shift(&c, true, false, 32);
 
     // SM transmits 1 bit per 8 execution cycles.
@@ -165,18 +166,18 @@ static inline void picoputerlinkin_program_init(PIO pio, uint sm, uint offset, u
     pio_sm_set_enabled(pio, sm, true);
 }
 
- uint32_t picoputerlinkin_get(PIO pio, uint sm)
+bool picoputerlinkin_get( PIO pio, uint sm, uint32_t *value )
 {
-  // read entire FIFO word
-  io_rw_32 *rxfifo_shift = (io_rw_32*)&pio->rxf[sm];
-  if (pio_sm_is_rx_fifo_empty(pio, sm))
-    {
-      // 0 indicates no data
-      return 0;
-    }
+  if( pio_sm_is_rx_fifo_empty(pio, sm) )
+  {	
+    return false;
+  }
 
-  // Set LSB to indicate data present
-  return ((uint32_t)*rxfifo_shift) | 1;
+  /* rfx is a shift register, reading from it shifts the contents out */	
+  io_rw_32 *rxfifo_shift = (io_rw_32*)&pio->rxf[sm];
+  *value = ((uint32_t)*rxfifo_shift);
+
+  return true;
 }
 
 %}

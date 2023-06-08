@@ -23,6 +23,8 @@
 
 #include "../common/link_common.h"
 
+#undef DEBUG
+#define DEBUG 0
 
 void __time_critical_func(blip_test_pin)( int pin )
 {
@@ -39,10 +41,14 @@ void __time_critical_func(blip_test_pin)( int pin )
 }
 
 
-uint8_t receive_byte( PIO pio, int linkin_sm )
+link_received_t receive_byte( PIO pio, int linkin_sm, uint8_t *received_value )
 {
   /* Read from PIO input FIFO */
-  uint32_t data = picoputerlinkin_get(pio, linkin_sm);
+  uint32_t data;
+  if( picoputerlinkin_get( pio, linkin_sm, &data ) == false )
+  {
+    return LINK_BYTE_NONE;
+  }
 
   /* Invert what's been received */
   data = data ^ 0xFFFFFFFF;
@@ -56,11 +62,35 @@ uint8_t receive_byte( PIO pio, int linkin_sm )
   /* Mask out data, just to be sure */
   data &= 0xff;
 
-  return (uint8_t)data;
+  *received_value = (uint8_t)data;
+
+  return LINK_BYTE_DATA;
+}
+
+
+void receive_buffer( PIO pio, int linkin_sm, uint8_t *data, uint32_t count )
+{
+  while( count )
+  {
+    while( receive_byte( pio0, linkin_sm, data ) == LINK_BYTE_NONE );
+    data++;
+    count--;
+  }
 }
 
 
 void send_byte( PIO pio, int linkout_sm, uint8_t data )
 {
   pio_sm_put_blocking(pio, linkout_sm, 0x200 | (((uint32_t)data ^ 0xff)<<1));
+}
+
+
+void send_buffer( PIO pio, int linkout_sm, uint8_t *data, uint32_t count )
+{
+  while( count )
+  {
+    send_byte( pio, linkout_sm, *data );
+    data++;
+    count--;
+  }
 }
