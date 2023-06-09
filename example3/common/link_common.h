@@ -36,4 +36,7 @@ void receive_buffer( PIO pio, int linkin_sm, int linkout_sm, uint8_t *data, uint
 void send_byte( PIO pio, int linkout_sm, int linkin_sm, uint8_t data );
 void send_buffer( PIO pio, int linkout_sm, int linkin_sm, const uint8_t *data, uint32_t count );
 
+void send_init_sequence( PIO pio, int linkout_sm, int linkin_sm );
+void wait_for_init_sequence( PIO pio, int linkin_sm, int linkout_sm );
+
 #endif

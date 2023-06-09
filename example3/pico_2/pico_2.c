@@ -68,28 +68,9 @@ int main()
   offset          = pio_add_program(pio0, &picoputerlinkin_program);
   picoputerlinkin_program_init(pio0, linkin_sm, offset, LINKIN_PIN);
 
-  printf("Waiting for init string\n" );
-
-  uint8_t init_msg[] = { 0x02, 0x04, 0x08, 0 };
-  uint8_t *init_msg_ptr = init_msg;
-  while(1)
-  {
-    uint8_t chr;
-    while( receive_acked_byte( pio0, linkin_sm, linkout_sm, &chr ) == LINK_BYTE_NONE );
-    printf("Received 0x%02X\n", chr );
-    if( chr == *init_msg_ptr )
-    {
-      init_msg_ptr++;
-      if( chr == '\0' )
-	break;
-    }
-    else
-    {
-      init_msg_ptr = init_msg;
-    }
-  }
-  printf("Received init string, returning ACK\n" );
-  send_byte( pio0, linkout_sm, linkin_sm, 0xDF );
+  printf("Waiting for init sequence...\n" );
+  wait_for_init_sequence( pio0, linkin_sm, linkout_sm );
+  printf("...received and ACKed\n" );
 
   printf("Entering loop\n" );
   while(1)

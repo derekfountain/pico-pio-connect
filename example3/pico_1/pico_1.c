@@ -76,15 +76,9 @@ int main()
   /* This side needs to wait for the receiver to start up */
   sleep_ms(2000);
 
-  printf("Sending init string\n" );
-  const uint8_t init_msg[] = { 0x02, 0x04, 0x08, 0 };
-  send_buffer( pio0, linkout_sm, linkin_sm, init_msg, sizeof(init_msg) );
-  uint8_t ack;
-  printf("Waiting for ACK\n" );
-  while( (receive_acked_byte( pio0, linkin_sm, linkout_sm, &ack ) == LINK_BYTE_NONE)
-	 &&
-	 (ack != 0xDF) );
-  printf("Received\n" );
+  printf("Sending init string...\n" );
+  send_init_sequence( pio0, linkout_sm, linkin_sm );
+  printf("...received ACK\n" );
 
   while( 1 )
   {
