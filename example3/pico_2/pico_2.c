@@ -34,13 +34,13 @@ const uint8_t LED_PIN         = PICO_DEFAULT_LED_PIN;
 const uint8_t LINKOUT_PIN     = 15;
 const uint8_t LINKIN_PIN      = 14;
 
-#define TEST_BUFFER_SIZE 16
+#define TEST_BUFFER_SIZE 16384
 uint8_t rx_buffer[TEST_BUFFER_SIZE];
 
 int main()
 {
   stdio_init_all();  
-  sleep_ms(5000);
+  sleep_ms(2000);
 
   printf("Receiving Pico\n\n");
 
@@ -68,11 +68,35 @@ int main()
   offset          = pio_add_program(pio0, &picoputerlinkin_program);
   picoputerlinkin_program_init(pio0, linkin_sm, offset, LINKIN_PIN);
 
+  printf("Waiting for init string\n" );
+
+  uint8_t init_msg[] = { 0x02, 0x04, 0x08, 0 };
+  uint8_t *init_msg_ptr = init_msg;
+  while(1)
+  {
+    uint8_t chr;
+    while( receive_acked_byte( pio0, linkin_sm, linkout_sm, &chr ) == LINK_BYTE_NONE );
+    printf("Received 0x%02X\n", chr );
+    if( chr == *init_msg_ptr )
+    {
+      init_msg_ptr++;
+      if( chr == '\0' )
+	break;
+    }
+    else
+    {
+      init_msg_ptr = init_msg;
+    }
+  }
+  printf("Received init string, returning ACK\n" );
+  send_byte( pio0, linkout_sm, linkin_sm, 0xDF );
+
+  printf("Entering loop\n" );
   while(1)
   {
     uint8_t data;
     gpio_put( TEST_OUTPUT_GP, 1 );
-    receive_buffer( pio0, linkin_sm, rx_buffer, TEST_BUFFER_SIZE );
+    receive_buffer( pio0, linkin_sm, linkout_sm, rx_buffer, TEST_BUFFER_SIZE );
     gpio_put( TEST_OUTPUT_GP, 0 );
 
     uint8_t checksum = 0;
@@ -81,10 +105,10 @@ int main()
       checksum += rx_buffer[i];
     }
     gpio_put( TEST_OUTPUT_GP, 1 );
-    send_byte( pio0, linkout_sm, checksum );
+    send_byte( pio0, linkout_sm, linkin_sm, checksum );
     gpio_put( TEST_OUTPUT_GP, 0 );
     
-    for( int i=0; i < TEST_BUFFER_SIZE; i++ )
+    for( int i=0; i < 16; i++ )
     {
       printf("Received %d : 0x%02X\n", i, rx_buffer[i] );
     }

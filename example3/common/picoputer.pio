@@ -168,13 +168,13 @@ static inline void picoputerlinkin_program_init(PIO pio, uint sm, uint offset, u
 
 bool picoputerlinkin_get( PIO pio, uint sm, uint32_t *value )
 {
+  io_rw_32 *rxfifo_shift = (io_rw_32*)&pio->rxf[sm];
   if( pio_sm_is_rx_fifo_empty(pio, sm) )
   {	
     return false;
   }
 
   /* rfx is a shift register, reading from it shifts the contents out */	
-  io_rw_32 *rxfifo_shift = (io_rw_32*)&pio->rxf[sm];
   *value = ((uint32_t)*rxfifo_shift);
 
   return true;

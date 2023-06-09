@@ -41,7 +41,7 @@ void __time_critical_func(blip_test_pin)( int pin )
 }
 
 
-link_received_t receive_byte( PIO pio, int linkin_sm, uint8_t *received_value )
+static link_received_t receive_byte( PIO pio, int linkin_sm, uint8_t *received_value )
 {
   /* Read from PIO input FIFO */
   uint32_t data;
@@ -68,28 +68,46 @@ link_received_t receive_byte( PIO pio, int linkin_sm, uint8_t *received_value )
 }
 
 
-void receive_buffer( PIO pio, int linkin_sm, uint8_t *data, uint32_t count )
+link_received_t receive_acked_byte( PIO pio, int linkin_sm, int linkout_sm, uint8_t *received_value )
+{
+  if( receive_byte( pio, linkin_sm, received_value ) == LINK_BYTE_NONE )
+    return LINK_BYTE_NONE;
+
+  pio_sm_put_blocking(pio, linkout_sm, 0x200 | (((uint32_t)*received_value ^ 0xff)<<1));
+
+  return LINK_BYTE_DATA;
+}
+
+
+void receive_buffer( PIO pio, int linkin_sm, int linkout_sm, uint8_t *data, uint32_t count )
 {
   while( count )
   {
-    while( receive_byte( pio0, linkin_sm, data ) == LINK_BYTE_NONE );
+    while( receive_acked_byte( pio0, linkin_sm, linkout_sm, data ) == LINK_BYTE_NONE );
     data++;
     count--;
   }
 }
 
 
-void send_byte( PIO pio, int linkout_sm, uint8_t data )
+void send_byte( PIO pio, int linkout_sm, int linkin_sm, uint8_t data )
 {
   pio_sm_put_blocking(pio, linkout_sm, 0x200 | (((uint32_t)data ^ 0xff)<<1));
+
+  uint8_t ack;
+  do
+  {
+    while( receive_byte( pio0, linkin_sm, &ack ) == LINK_BYTE_NONE );
+  } while( ack != data );
+  
 }
 
 
-void send_buffer( PIO pio, int linkout_sm, uint8_t *data, uint32_t count )
+void send_buffer( PIO pio, int linkout_sm, int linkedin_sm, const uint8_t *data, uint32_t count )
 {
   while( count )
   {
-    send_byte( pio, linkout_sm, *data );
+    send_byte( pio, linkout_sm, linkedin_sm, *data );
     data++;
     count--;
   }
