@@ -69,7 +69,7 @@ concept and get it working. The integration with the user's project is
 the next part of the exercise.
 
 This project is GPL, as per Andrew's original code. If you need a different
-licence, ask me or Andrew. We flexible on the issue, it depends what you're
+licence, ask me or Andrew. We're flexible on the issue, it depends what you're
 doing.
 
 Derek Fountain
