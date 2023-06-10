@@ -23,24 +23,15 @@
 
 #include "../common/link_common.h"
 
-#undef DEBUG
-#define DEBUG 0
-
-void __time_critical_func(blip_test_pin)( int pin )
-{
-  gpio_put( pin, 1 );
-  __asm volatile ("nop");
-  __asm volatile ("nop");
-  __asm volatile ("nop");
-  __asm volatile ("nop");
-  gpio_put( pin, 0 );
-  __asm volatile ("nop");
-  __asm volatile ("nop");
-  __asm volatile ("nop");
-  __asm volatile ("nop");
-}
-
-
+/*
+ * Receive a byte from the link. The received value goes into the given location,
+ * and the routine returns one of the status values indicating no data received,
+ * an acknowledgement received, or data received.
+ *
+ * The function name is a bit of a misnomer; if you're expecting an ACK then you
+ * don't actually receive a byte. In this case you should pass received_value as
+ * NULL.
+ */
 static link_received_t receive_byte( PIO pio, int linkin_sm, uint8_t *received_value )
 {
   /* Read from PIO input FIFO */
@@ -55,10 +46,10 @@ static link_received_t receive_byte( PIO pio, int linkin_sm, uint8_t *received_v
 
   /* It arrives from the PIO at the top end of the word, so shift down */
   data >>= 22;
-      
+
+  /* Magic value indicates a ACK on the wire */
   if( data == 0x100 )
   {
-    /* ACK pattern on the wire */
     return LINK_BYTE_ACK;
   }
   else
@@ -69,24 +60,31 @@ static link_received_t receive_byte( PIO pio, int linkin_sm, uint8_t *received_v
     /* Mask out data, just to be sure */
     data &= 0xff;
 
-    *received_value = (uint8_t)data;
+    if( received_value != NULL )
+      *received_value = (uint8_t)data;
 
     return LINK_BYTE_DATA;
   }
 }
 
 
+/*
+ * Receive a byte and ACK it back to the sender
+ */
 link_received_t receive_acked_byte( PIO pio, int linkin_sm, int linkout_sm, uint8_t *received_value )
 {
   if( receive_byte( pio, linkin_sm, received_value ) == LINK_BYTE_NONE )
     return LINK_BYTE_NONE;
 
-  pio_sm_put_blocking(pio, linkout_sm, 0x200 | (((uint32_t)*received_value ^ 0xff)<<1));
+  send_ack_to_link( pio, linkout_sm );
 
   return LINK_BYTE_DATA;
 }
 
 
+/*
+ * Receive a number of bytes into the given buffer. Bytes are acknowledged.
+ */
 void receive_buffer( PIO pio, int linkin_sm, int linkout_sm, uint8_t *data, uint32_t count )
 {
   while( count )
@@ -98,25 +96,30 @@ void receive_buffer( PIO pio, int linkin_sm, int linkout_sm, uint8_t *data, uint
 }
 
 
+/*
+ * Send an ACK.
+ */
 void send_ack_to_link( PIO pio, int linkout_sm )
 {
+  /* Sends the magic value */
   pio_sm_put_blocking( pio, linkout_sm, (uint32_t)0x2ff );
 }
 
 
+/*
+ * Send a byte and wait for the receiver to acknowledge it.
+ */
 void send_byte( PIO pio, int linkout_sm, int linkin_sm, uint8_t data )
 {
   pio_sm_put_blocking(pio, linkout_sm, 0x200 | (((uint32_t)data ^ 0xff)<<1));
 
-  uint8_t ack;
-  do
-  {
-    while( receive_byte( pio0, linkin_sm, &ack ) == LINK_BYTE_NONE );
-  } while( ack != data );
-  
+  while( receive_byte( pio0, linkin_sm, NULL ) != LINK_BYTE_ACK );
 }
 
 
+/*
+ * Send a buffer of bytes. All bytes are acknowledged.
+ */
 void send_buffer( PIO pio, int linkout_sm, int linkin_sm, const uint8_t *data, uint32_t count )
 {
   while( count )
@@ -128,17 +131,24 @@ void send_buffer( PIO pio, int linkout_sm, int linkin_sm, const uint8_t *data, u
 }
 
 
+/*
+ * Send a magic sequence of known bytes. This marries up with the
+ * wait_for_init_sequence() function and is used to initialise the
+ * link. It gets the two sides in sync.
+ */
 void send_init_sequence( PIO pio, int linkout_sm, int linkin_sm )
 {
   const uint8_t init_msg[] = { 0x02, 0x04, 0x08, 0 };
   send_buffer( pio0, linkout_sm, linkin_sm, init_msg, sizeof(init_msg) );
-  uint8_t ack;
-  while( (receive_acked_byte( pio0, linkin_sm, linkout_sm, &ack ) == LINK_BYTE_NONE)
-	 &&
-	 (ack != 0xDF) );
+
+  while( receive_byte( pio0, linkin_sm, NULL ) != LINK_BYTE_ACK );
 }
 
 
+/*
+ * Wait for the initialisation sequence sent by the send_init_sequence()
+ * function.
+ */
 void wait_for_init_sequence( PIO pio, int linkin_sm, int linkout_sm )
 {
   uint8_t init_msg[] = { 0x02, 0x04, 0x08, 0 };
@@ -158,10 +168,29 @@ void wait_for_init_sequence( PIO pio, int linkin_sm, int linkout_sm )
       init_msg_ptr = init_msg;
     }
   }
-  send_byte( pio0, linkout_sm, linkin_sm, 0xDF );
+  send_ack_to_link( pio, linkout_sm );
 }
 
 
+void __time_critical_func(blip_test_pin)( int pin )
+{
+  gpio_put( pin, 1 );
+  __asm volatile ("nop");
+  __asm volatile ("nop");
+  __asm volatile ("nop");
+  __asm volatile ("nop");
+  gpio_put( pin, 0 );
+  __asm volatile ("nop");
+  __asm volatile ("nop");
+  __asm volatile ("nop");
+  __asm volatile ("nop");
+}
+
+
+/*
+ * Standard 16 bit checksum, nicked from the Wikipedia entry.
+ * Not part of the protocol as such, but might be useful.
+ */
 uint16_t fletcher16( uint8_t *data, int count )
 {
   uint32_t c0, c1;

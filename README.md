@@ -40,7 +40,8 @@ to make them compatible with transputer related communications hardware.
 Hence some inverted signals and other ostensibly odd design decisions.
 
 The examples flow one into the next. If you're considering your options,
-start at the first one.
+start at the first one. If you want to send blocks of data back and
+forth you might as well start with example 4.
 
 ## Example 1
 
@@ -61,6 +62,12 @@ Moving on to buffers of data, as opposed to individual bytes. It's mostly
 just loops around the single byte primitives, but it also deals with 
 unexpected start up noise, flow control and introduces the idea of the
 recepient acknowledging every byte transmitted.
+
+## Example 4
+
+This example sends buffers of data across the link much like example 3,
+only the buffers are bigger, the ACK is a 2 bit pattern as opposed to
+an echo of the byte received, and the code is better commented.
 
 ---
 
