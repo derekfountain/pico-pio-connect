@@ -34,7 +34,7 @@ const uint8_t LED_PIN         = PICO_DEFAULT_LED_PIN;
 const uint8_t LINKOUT_PIN     = 15;
 const uint8_t LINKIN_PIN      = 14;
 
-#define TEST_BUFFER_SIZE 16384
+#define TEST_BUFFER_SIZE 137922
 uint8_t rx_buffer[TEST_BUFFER_SIZE];
 
 int main()
@@ -80,20 +80,19 @@ int main()
     receive_buffer( pio0, linkin_sm, linkout_sm, rx_buffer, TEST_BUFFER_SIZE );
     gpio_put( TEST_OUTPUT_GP, 0 );
 
-    uint8_t checksum = 0;
-    for( int i=0; i < TEST_BUFFER_SIZE; i++ )
-    {
-      checksum += rx_buffer[i];
-    }
+    uint16_t checksum = fletcher16( rx_buffer, TEST_BUFFER_SIZE );
     gpio_put( TEST_OUTPUT_GP, 1 );
-    send_byte( pio0, linkout_sm, linkin_sm, checksum );
+    send_buffer( pio0, linkout_sm, linkin_sm, (uint8_t*)&checksum, 2 );
     gpio_put( TEST_OUTPUT_GP, 0 );
-    
+
+#if 0    
     for( int i=0; i < 16; i++ )
     {
       printf("Received %d : 0x%02X\n", i, rx_buffer[i] );
     }
+#endif
+
     printf("\n\n" );
-    printf("Sending back checksum of 0x%02X\n\n\n", checksum );
+    printf("Sending back checksum of 0x%04X\n\n\n", checksum );
   }
 }

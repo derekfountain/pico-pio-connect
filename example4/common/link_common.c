@@ -56,15 +56,23 @@ static link_received_t receive_byte( PIO pio, int linkin_sm, uint8_t *received_v
   /* It arrives from the PIO at the top end of the word, so shift down */
   data >>= 22;
       
-  /* Remove stop bit in LSB */
-  data >>= 1;
-	  
-  /* Mask out data, just to be sure */
-  data &= 0xff;
+  if( data == 0x100 )
+  {
+    /* ACK pattern on the wire */
+    return LINK_BYTE_ACK;
+  }
+  else
+  {
+    /* Remove stop bit in LSB */
+    data >>= 1;
+    
+    /* Mask out data, just to be sure */
+    data &= 0xff;
 
-  *received_value = (uint8_t)data;
+    *received_value = (uint8_t)data;
 
-  return LINK_BYTE_DATA;
+    return LINK_BYTE_DATA;
+  }
 }
 
 
@@ -87,6 +95,12 @@ void receive_buffer( PIO pio, int linkin_sm, int linkout_sm, uint8_t *data, uint
     data++;
     count--;
   }
+}
+
+
+void send_ack_to_link( PIO pio, int linkout_sm )
+{
+  pio_sm_put_blocking( pio, linkout_sm, (uint32_t)0x2ff );
 }
 
 
@@ -145,4 +159,26 @@ void wait_for_init_sequence( PIO pio, int linkin_sm, int linkout_sm )
     }
   }
   send_byte( pio0, linkout_sm, linkin_sm, 0xDF );
+}
+
+
+uint16_t fletcher16( uint8_t *data, int count )
+{
+  uint32_t c0, c1;
+
+  for (c0 = c1 = 0; count > 0; )
+  {
+    size_t blocklen = count;
+    if (blocklen > 5802) {
+      blocklen = 5802;
+    }
+    count -= blocklen;
+    do {
+      c0 = c0 + *data++;
+      c1 = c1 + c0;
+    } while (--blocklen);
+    c0 = c0 % 255;
+    c1 = c1 % 255;
+  }
+  return (c1 << 8 | c0);
 }

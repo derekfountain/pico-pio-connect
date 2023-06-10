@@ -33,10 +33,13 @@ bool picoputerlinkin_get( PIO pio, uint sm, uint32_t *value );
 void blip_test_pin( int pin );
 link_received_t receive_acked_byte( PIO pio, int linkin_sm, int linkout_sm, uint8_t *received_value );
 void receive_buffer( PIO pio, int linkin_sm, int linkout_sm, uint8_t *data, uint32_t count );
+void send_ack_to_link( PIO pio, int linkout_sm );
 void send_byte( PIO pio, int linkout_sm, int linkin_sm, uint8_t data );
 void send_buffer( PIO pio, int linkout_sm, int linkin_sm, const uint8_t *data, uint32_t count );
 
 void send_init_sequence( PIO pio, int linkout_sm, int linkin_sm );
 void wait_for_init_sequence( PIO pio, int linkin_sm, int linkout_sm );
+
+uint16_t fletcher16( uint8_t *data, int count );
 
 #endif
