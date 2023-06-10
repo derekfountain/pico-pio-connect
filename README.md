@@ -10,7 +10,7 @@ Normally, anyone wanting to connect two Picos together so they can exchange
 data would use one of the existing hardware solutions the Pico supports.
 
 UARTs would likely be the first choice, but UARTs are slow. Less than 1Mbps.
-Reliable and felxible though.
+Reliable and flexible though.
 
 SPI is much faster, but it's a basic protocol based on master and slave
 exchanges. No framing, so not ideal for noisy links. It requires lots of
@@ -18,6 +18,11 @@ GPIOs. It's not really suited to peer to peer because it's single master.
 
 I2C is another option. This one has framing which means it's more reliable,
 but it's much slower than SPI. The Pico's fast mode gets it to 1Mbps.
+
+The requirement, then, is a method of transmitting data from Pico to Pico
+quickly, reliably, and with a peer to peer link in mind. The PIO hardware
+in the RP2040 is ideal for this. There's no one size fits all solution to
+communications protocols, but this one meets a lot of requirements.
 
 ## Andrew Menadue's Transputer Link
 
