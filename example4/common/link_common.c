@@ -89,7 +89,7 @@ void receive_buffer( PIO pio, int linkin_sm, int linkout_sm, uint8_t *data, uint
 {
   while( count )
   {
-    while( receive_acked_byte( pio0, linkin_sm, linkout_sm, data ) == LINK_BYTE_NONE );
+    while( receive_acked_byte( pio, linkin_sm, linkout_sm, data ) == LINK_BYTE_NONE );
     data++;
     count--;
   }
@@ -113,7 +113,7 @@ void send_byte( PIO pio, int linkout_sm, int linkin_sm, uint8_t data )
 {
   pio_sm_put_blocking(pio, linkout_sm, 0x200 | (((uint32_t)data ^ 0xff)<<1));
 
-  while( receive_byte( pio0, linkin_sm, NULL ) != LINK_BYTE_ACK );
+  while( receive_byte( pio, linkin_sm, NULL ) != LINK_BYTE_ACK );
 }
 
 
@@ -139,9 +139,9 @@ void send_buffer( PIO pio, int linkout_sm, int linkin_sm, const uint8_t *data, u
 void send_init_sequence( PIO pio, int linkout_sm, int linkin_sm )
 {
   const uint8_t init_msg[] = { 0x02, 0x04, 0x08, 0 };
-  send_buffer( pio0, linkout_sm, linkin_sm, init_msg, sizeof(init_msg) );
+  send_buffer( pio, linkout_sm, linkin_sm, init_msg, sizeof(init_msg) );
 
-  while( receive_byte( pio0, linkin_sm, NULL ) != LINK_BYTE_ACK );
+  while( receive_byte( pio, linkin_sm, NULL ) != LINK_BYTE_ACK );
 }
 
 
@@ -156,7 +156,7 @@ void wait_for_init_sequence( PIO pio, int linkin_sm, int linkout_sm )
   while(1)
   {
     uint8_t chr;
-    while( receive_acked_byte( pio0, linkin_sm, linkout_sm, &chr ) == LINK_BYTE_NONE );
+    while( receive_acked_byte( pio, linkin_sm, linkout_sm, &chr ) == LINK_BYTE_NONE );
     if( chr == *init_msg_ptr )
     {
       init_msg_ptr++;
